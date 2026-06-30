@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote
 
 import requests
 from flask import Flask, jsonify, request
@@ -13,22 +14,60 @@ WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "telegram-webhook")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else None
 
 
-def send_telegram_message(chat_id, text: str):
+def send_telegram_message(chat_id, text: str, reply_markup=None):
     if not TELEGRAM_API_URL:
         raise RuntimeError("TELEGRAM_BOT_TOKEN environment variable is missing.")
 
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+
     response = requests.post(
         f"{TELEGRAM_API_URL}/sendMessage",
-        json={
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        },
+        json=payload,
         timeout=15,
     )
     response.raise_for_status()
     return response.json()
+
+
+def stock_detail_keyboard(stock: dict):
+    detail_link = stock.get("detail_link", "")
+    symbol = stock.get("symbol", "").strip().upper()
+
+    buttons = []
+
+    if detail_link.startswith("http"):
+        buttons.append(
+            {
+                "text": "Detay sayfasini ac",
+                "url": detail_link,
+            }
+        )
+
+    if symbol:
+        tradingview_symbol = quote(f"BIST:{symbol}", safe="")
+        buttons.append(
+            {
+                "text": "TradingView grafigi",
+                "url": f"https://www.tradingview.com/chart/?symbol={tradingview_symbol}",
+            }
+        )
+
+    if not buttons:
+        return None
+
+    return {
+        "inline_keyboard": [
+            buttons
+        ]
+    }
 
 
 def help_message() -> str:
@@ -84,7 +123,7 @@ def handle_message(message: dict):
         send_telegram_message(chat_id, f"{symbol} icin veri bulunamadi.")
         return
 
-    send_telegram_message(chat_id, format_stock_message(stock))
+    send_telegram_message(chat_id, format_stock_message(stock), stock_detail_keyboard(stock))
 
 
 @app.get("/")

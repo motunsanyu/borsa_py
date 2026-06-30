@@ -110,24 +110,20 @@ def safe_text(value) -> str:
 def format_stock_message(stock: dict) -> str:
     symbol = safe_text(stock.get("symbol", "-"))
     company_name = safe_text(get_company_name(stock))
-    separator = "————————————————————————————"
+    separator = "————————————————"
 
     return (
         f"<b>{symbol} - {company_name}</b>\n"
         f"{separator}\n"
-        f"<pre>"
-        f"💰 Fiyat     : {safe_text(stock.get('price', '-'))}\n\n"
-        f"📉 Degisim   : {safe_text(stock.get('change_percentage', '-'))}\n"
-        f"📈 En yuksek : {safe_text(stock.get('high', '-'))}\n"
-        f"📉 En dusuk  : {safe_text(stock.get('low', '-'))}\n"
-        f"⚖️ AOF       : {safe_text(stock.get('aof', '-'))}\n"
-        f"📦 Hacim lot : {safe_text(stock.get('volume_lot', '-'))}\n"
-        f"💵 Hacim TL  : {safe_text(stock.get('volume_tl', '-'))}\n"
-        f"🕒 Saat      : {safe_text(stock.get('time', '-'))}"
-        f"</pre>\n"
-        f"{separator}\n"
-        f"🔗 Detay:\n"
-        f"{safe_text(stock.get('detail_link', '-'))}"
+        f"💰 <b>Fiyat</b>     : {safe_text(stock.get('price', '-'))}\n\n"
+        f"📉 <b>Degisim</b>   : {safe_text(stock.get('change_percentage', '-'))}\n"
+        f"📈 <b>En yuksek</b> : {safe_text(stock.get('high', '-'))}\n"
+        f"📉 <b>En dusuk</b>  : {safe_text(stock.get('low', '-'))}\n"
+        f"⚖️ <b>AOF</b>       : {safe_text(stock.get('aof', '-'))}\n"
+        f"📦 <b>Hacim lot</b> : {safe_text(stock.get('volume_lot', '-'))}\n"
+        f"💵 <b>Hacim TL</b>  : {safe_text(stock.get('volume_tl', '-'))}\n"
+        f"🕒 <b>Saat</b>      : {safe_text(stock.get('time', '-'))}\n"
+        f"{separator}"
     )
 
 def update_supabase(data_list: list):
