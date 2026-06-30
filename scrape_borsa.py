@@ -1,12 +1,18 @@
 import requests
 import os
 import time
+from html import escape
+from urllib.parse import urlparse
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "YOUR_SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "YOUR_SUPABASE_KEY")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
+COMPANY_NAMES = {
+    "ASELS": "ASELSAN",
 }
 
 def scrape_borsa():
@@ -82,18 +88,46 @@ def get_stock(symbol: str):
 
     return None
 
+def get_company_name(stock: dict) -> str:
+    symbol = stock.get("symbol", "").upper()
+    if symbol in COMPANY_NAMES:
+        return COMPANY_NAMES[symbol]
+
+    detail_link = stock.get("detail_link", "")
+    slug = urlparse(detail_link).path.strip("/").split("/")[-1]
+    parts = [part for part in slug.split("-") if part]
+
+    if len(parts) > 1:
+        return " ".join(parts[1:]).upper()
+
+    return stock.get("name") or symbol
+
+def safe_text(value) -> str:
+    if value is None:
+        return "-"
+    return escape(str(value))
+
 def format_stock_message(stock: dict) -> str:
+    symbol = safe_text(stock.get("symbol", "-"))
+    company_name = safe_text(get_company_name(stock))
+    separator = "————————————————————————————"
+
     return (
-        f"<b>{stock.get('symbol', '-')}</b>\n\n"
-        f"Fiyat: {stock.get('price', '-')}\n"
-        f"Degisim: {stock.get('change_percentage', '-')}\n"
-        f"En yuksek: {stock.get('high', '-')}\n"
-        f"En dusuk: {stock.get('low', '-')}\n"
-        f"AOF: {stock.get('aof', '-')}\n"
-        f"Hacim lot: {stock.get('volume_lot', '-')}\n"
-        f"Hacim TL: {stock.get('volume_tl', '-')}\n"
-        f"Saat: {stock.get('time', '-')}\n"
-        f"Detay: {stock.get('detail_link', '-')}"
+        f"<b>{symbol} - {company_name}</b>\n"
+        f"{separator}\n"
+        f"<pre>"
+        f"💰 Fiyat     : {safe_text(stock.get('price', '-'))}\n\n"
+        f"📉 Degisim   : {safe_text(stock.get('change_percentage', '-'))}\n"
+        f"📈 En yuksek : {safe_text(stock.get('high', '-'))}\n"
+        f"📉 En dusuk  : {safe_text(stock.get('low', '-'))}\n"
+        f"⚖️ AOF       : {safe_text(stock.get('aof', '-'))}\n"
+        f"📦 Hacim lot : {safe_text(stock.get('volume_lot', '-'))}\n"
+        f"💵 Hacim TL  : {safe_text(stock.get('volume_tl', '-'))}\n"
+        f"🕒 Saat      : {safe_text(stock.get('time', '-'))}"
+        f"</pre>\n"
+        f"{separator}\n"
+        f"🔗 Detay:\n"
+        f"{safe_text(stock.get('detail_link', '-'))}"
     )
 
 def update_supabase(data_list: list):

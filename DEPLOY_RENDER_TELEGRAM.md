@@ -212,7 +212,7 @@ Telegram'a bot mesajlarini Render servisimize gondermesini soylememiz gerekiyor.
 Webhook URL formati:
 
 ```text
-https://api.telegram.org/botBOT_TOKEN/setWebhook?url=RENDER_URL/telegram/TELEGRAM_WEBHOOK_SECRET
+https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<RENDER_URL>/telegram/<TELEGRAM_WEBHOOK_SECRET>
 ```
 
 Ornek:
@@ -222,6 +222,13 @@ https://api.telegram.org/bot1234567890:ABCdefGHIjkl/setWebhook?url=https://borsa
 ```
 
 Bu URL'yi tarayicida ac.
+
+Dikkat:
+
+- `<TELEGRAM_BOT_TOKEN>` yazan yere BotFather'dan aldigin gercek token gelecek.
+- `<RENDER_URL>` yazan yere Render servis URL'in gelecek.
+- `<TELEGRAM_WEBHOOK_SECRET>` yazan yere Render'da girdigin gizli yol gelecek.
+- URL'de `<`, `>`, `BOT_TOKEN`, `RENDER_URL` gibi yazilar kalmamali.
 
 Basarili olursa Telegram buna benzer bir cevap verir:
 
@@ -238,7 +245,7 @@ Basarili olursa Telegram buna benzer bir cevap verir:
 Webhook dogru mu diye kontrol etmek icin:
 
 ```text
-https://api.telegram.org/botBOT_TOKEN/getWebhookInfo
+https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo
 ```
 
 Ornek:
