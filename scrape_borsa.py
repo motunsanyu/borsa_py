@@ -107,6 +107,10 @@ def safe_text(value) -> str:
         return "-"
     return escape(str(value))
 
+def stock_line(icon: str, label: str, value, width: int = 9) -> str:
+    padding = "\u00A0" * max(width - len(label), 0)
+    return f"{icon} <b>{escape(label)}</b>{padding}: {safe_text(value)}"
+
 def format_stock_message(stock: dict) -> str:
     symbol = safe_text(stock.get("symbol", "-"))
     company_name = safe_text(get_company_name(stock))
@@ -115,14 +119,14 @@ def format_stock_message(stock: dict) -> str:
     return (
         f"<b>{symbol} - {company_name}</b>\n"
         f"{separator}\n"
-        f"💰 <b>Fiyat</b>     : {safe_text(stock.get('price', '-'))}\n\n"
-        f"📉 <b>Degisim</b>   : {safe_text(stock.get('change_percentage', '-'))}\n"
-        f"📈 <b>En yuksek</b> : {safe_text(stock.get('high', '-'))}\n"
-        f"📉 <b>En dusuk</b>  : {safe_text(stock.get('low', '-'))}\n"
-        f"⚖️ <b>AOF</b>       : {safe_text(stock.get('aof', '-'))}\n"
-        f"📦 <b>Hacim lot</b> : {safe_text(stock.get('volume_lot', '-'))}\n"
-        f"💵 <b>Hacim TL</b>  : {safe_text(stock.get('volume_tl', '-'))}\n"
-        f"🕒 <b>Saat</b>      : {safe_text(stock.get('time', '-'))}\n"
+        f"{stock_line('💰', 'Fiyat', stock.get('price', '-'))}\n\n"
+        f"{stock_line('📉', 'Degisim', stock.get('change_percentage', '-'))}\n"
+        f"{stock_line('📈', 'En yuksek', stock.get('high', '-'))}\n"
+        f"{stock_line('📉', 'En dusuk', stock.get('low', '-'))}\n"
+        f"{stock_line('⚖️', 'AOF', stock.get('aof', '-'))}\n"
+        f"{stock_line('📦', 'Hacim lot', stock.get('volume_lot', '-'))}\n"
+        f"{stock_line('💵', 'Hacim TL', stock.get('volume_tl', '-'))}\n"
+        f"{stock_line('🕒', 'Saat', stock.get('time', '-'))}\n"
         f"{separator}"
     )
 
