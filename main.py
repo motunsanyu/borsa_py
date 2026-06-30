@@ -46,7 +46,7 @@ def stock_detail_keyboard(stock: dict):
     if detail_link.startswith("http"):
         buttons.append(
             {
-                "text": "Detay sayfasini ac",
+                "text": "Detay",
                 "url": detail_link,
             }
         )
@@ -55,7 +55,7 @@ def stock_detail_keyboard(stock: dict):
         tradingview_symbol = quote(f"BIST:{symbol}", safe="")
         buttons.append(
             {
-                "text": "TradingView grafigi",
+                "text": "Tradingview",
                 "url": f"https://www.tradingview.com/chart/?symbol={tradingview_symbol}",
             }
         )
