@@ -306,6 +306,38 @@ Kontrol et:
 - `TELEGRAM_WEBHOOK_SECRET` ile webhook URL'indeki gizli yol ayni mi?
 - Telegram `getWebhookInfo` cevabinda hata var mi?
 
+### Render logunda `ModuleNotFoundError: No module named 'app'` yaziyor
+
+Sebep:
+
+Render `gunicorn app:app` komutunu calistiriyor ama GitHub'daki commit icinde `app.py` dosyasi yok.
+
+Cozum 1:
+
+Render `Start Command` alanini su yap:
+
+```text
+gunicorn main:app
+```
+
+Cozum 2:
+
+Projede bulunan `app.py` dosyasini GitHub'a yukle. Dosyanin icerigi su olmali:
+
+```python
+from main import app
+```
+
+Terminal ile yuklemek icin:
+
+```powershell
+git add app.py DEPLOY_RENDER_TELEGRAM.md
+git commit -m "Add Render app entrypoint"
+git push
+```
+
+Sonra Render'da `Manual Deploy > Deploy latest commit` yap.
+
 ### Render loglarinda TELEGRAM_BOT_TOKEN hatasi var
 
 Sebep:
@@ -371,4 +403,3 @@ TELEGRAM_WEBHOOK_SECRET
 6. Render URL'ini al.
 7. Telegram `setWebhook` URL'ini tarayicida ac.
 8. Telegram'da `/hisse THYAO` ile test et.
-
