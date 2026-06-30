@@ -15,6 +15,23 @@ COMPANY_NAMES = {
     "ASELS": "ASELSAN",
 }
 
+def normalize_detail_link(link: str) -> str:
+    link = (link or "").strip()
+    if not link:
+        return ""
+
+    if not link.startswith("http"):
+        link = "https://finans.mynet.com/" + link.lstrip("/")
+
+    parsed = urlparse(link)
+    path_parts = [part for part in parsed.path.split("/") if part]
+
+    if "hisseler" in path_parts:
+        slug = path_parts[-1]
+        return f"https://finans.mynet.com/borsa/hisseler/{slug}/"
+
+    return link
+
 def scrape_borsa():
     url = "https://finans.mynet.com/borsa/canliborsa/?plist=finans-canliborsa-button"
     
@@ -47,10 +64,7 @@ def scrape_borsa():
                 aof = parts[10].strip()
                 vol_lot = parts[11].strip()
                 vol_tl = parts[12].strip()
-                link = parts[15].strip()
-                
-                if not link.startswith("http"):
-                    link = "https://finans.mynet.com/" + link.lstrip("/")
+                link = normalize_detail_link(parts[15])
                     
                 if symbol and price:
                     # Borsa açılmadan önceki sıfırlanmış fiyatları veritabanına yazmamak için:
@@ -108,8 +122,7 @@ def safe_text(value) -> str:
     return escape(str(value))
 
 def stock_line(icon: str, label: str, value, width: int = 9) -> str:
-    padding = "\u00A0" * max(width - len(label), 0)
-    return f"{icon} <b>{escape(label)}</b>{padding}: {safe_text(value)}"
+    return f"{icon} <code>{escape(label.ljust(width))}: {safe_text(value)}</code>"
 
 def format_stock_message(stock: dict) -> str:
     symbol = safe_text(stock.get("symbol", "-"))
