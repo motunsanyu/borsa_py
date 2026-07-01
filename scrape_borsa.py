@@ -530,11 +530,13 @@ def support_resistance_from_fibonacci(price: float, fibs: dict) -> tuple:
 # ─── Mesaj Formatı ────────────────────────────────────────────────────────────
 
 def tech_row(label: str, value: str, comment: str = "") -> str:
-    """Teknik gösterge satırı: 🔹 Etiket  : Değer  (yorum)"""
+    """Teknik gösterge satırı: 🔹 Etiket  : Değer \\n   yorum"""
     label_padded = label.ljust(12)
+    if not value:
+        return f"🔹 {label_padded} :\n   {comment}\n"
     if comment and comment != "-":
-        return f"🔹 {label_padded}: {value}\n\t\t  ({comment})"
-    return f"🔹 {label_padded}: {value}"
+        return f"🔹 {label_padded} : {value}\n   {comment}\n"
+    return f"🔹 {label_padded} : {value}\n"
 
 
 def support_resistance_table(s1, s2, r1, r2) -> str:
@@ -647,21 +649,12 @@ def build_technical_analysis(stock: dict) -> str:
     range_prob = "Yüksek" if adx is not None and adx < 20 else "Orta" if -1 <= score <= 1 else "Düşük"
     lower_prob = "Yüksek" if score <= -3 else "Orta" if score <= -1 else "Düşük"
 
-    # ── Momentum Satırı ──────────────────────────────────────────────────────
-    momentum_parts = []
-    if previous_close is not None and previous_close:
-        prev_perf = ((price - previous_close) / previous_close) * 100
-        momentum_parts.append(f"Önceki kapanış: {format_tr_number(prev_perf)}%")
-    if open_price is not None and open_price:
-        open_perf = ((price - open_price) / open_price) * 100
-        momentum_parts.append(f"Açılış: {format_tr_number(open_perf)}%")
-
     # ── Mesaj Bölümleri ───────────────────────────────────────────────────────
     section_technical = [
         "",
         f"📈 <b>TEKNİK GÖRÜNÜM (ÖZET)</b>",
         SEP,
-        tech_row("Trend", trend_summary(score)),
+        tech_row("Trend", "", trend_summary(score)),
         tech_row("RSI (14)", format_tr_number(rsi) if rsi is not None else "-", rsi_cmt),
         tech_row("Stoch RSI", f"{format_tr_number(stoch_k)} / {format_tr_number(stoch_d)}" if stoch_k is not None else "-", stoch_cmt),
         tech_row("MACD", f"{format_tr_number(macd)} / {format_tr_number(macd_sig)}" if macd is not None else "-", macd_cmt),
@@ -670,9 +663,6 @@ def build_technical_analysis(stock: dict) -> str:
         tech_row("SMA 5/20", f"{format_tr_number(sma5)} / {format_tr_number(sma20)}" if sma5 is not None else "-", sma_cmt),
         tech_row("EMA 20/50", f"{format_tr_number(ema20)} / {format_tr_number(ema50)}" if ema20 is not None else "-", ema_cmt),
     ]
-
-    if momentum_parts:
-        section_technical.append(tech_row("Momentum", " | ".join(momentum_parts)))
 
     section_technical.append(SEP)
 
@@ -688,13 +678,8 @@ def build_technical_analysis(stock: dict) -> str:
             SEP,
         ]
 
-    # ── Destek & Direnç ──────────────────────────────────────────────────────
-    table_str = support_resistance_table(s1, s2, r1, r2)
-    section_sr = [
-        "",
-        "📌 <b>DESTEK &amp; DİRENÇ</b>",
-        f"<code>{escape(table_str)}</code>",
-    ]
+    # ── Destek & Direnç (Kaldırıldı) ─────────────────────────────────────────
+    section_sr = []
 
     # ── Senaryolar ───────────────────────────────────────────────────────────
     r1_str = format_tr_number(r1) if r1 is not None else format_tr_number(high)
@@ -745,13 +730,13 @@ def format_stock_message(stock: dict) -> str:
         f"📊 <b>{company_name} ({symbol})</b>\n\n"
         f"📅 {format_report_date()} – {format_report_time()}\n"
         f"{SEP}\n"
-        f"💰 Fiyat       : {price_text}\n"
-        f"📉 Değişim     : {change_report_value(change_value)}\n"
-        f"📈 Günlük Max  : {stock.get('high', '-')}\n"
-        f"📉 Min         : {stock.get('low', '-')}\n"
-        f"⚖️ AOF (Ort.)  : {stock.get('aof', '-')}\n"
-        f"📦 Hacim Lot   : {format_compact_tr(stock.get('volume_lot', '-'))}\n"
-        f"💵 Hacim TL    : {format_compact_tr(stock.get('volume_tl', '-'))}\n"
+        f"Fiyat        : {price_text}\n"
+        f"Değişim      : {change_report_value(change_value)}\n"
+        f"Günlük Max   : {stock.get('high', '-')}\n"
+        f"Min          : {stock.get('low', '-')}\n"
+        f"AOF (Ort.)   : {stock.get('aof', '-')}\n"
+        f"Hacim Lot    : {format_compact_tr(stock.get('volume_lot', '-'))}\n"
+        f"Hacim TL     : {format_compact_tr(stock.get('volume_tl', '-'))}\n"
         f"{SEP}"
     )
 
