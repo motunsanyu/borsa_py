@@ -473,9 +473,9 @@ def ema_comment(price: float | None, ema20: float | None, ema50: float | None) -
     if price is None or ema20 is None or ema50 is None:
         return "-", 0
     if price > ema20 > ema50:
-        return "fiyat EMA20>EMA50 üstünde, güçlü yükseliş düzeni", 2
+        return "fiyat EMA20⟩EMA50 üstünde, güçlü yükseliş düzeni", 2
     if price < ema20 < ema50:
-        return "fiyat EMA20<EMA50 altında, güçlü düşüş düzeni", -2
+        return "fiyat EMA20⟨EMA50 altında, güçlü düşüş düzeni", -2
     if price > ema20:
         return "fiyat EMA20 üstünde, kısa vadeli pozitif", 1
     return "fiyat EMA20 altında, kısa vadeli negatif", -1
