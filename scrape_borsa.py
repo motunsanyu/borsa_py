@@ -560,9 +560,9 @@ def fibonacci_table(fibs: dict, price: float) -> str:
         val = fibs.get(lvl)
         if val is None:
             continue
-        if price > val:
+        if price < val:
             marker = "▲ direnç"
-        elif price < val:
+        elif price > val:
             marker = "▼ destek"
         else:
             marker = "← burada"
@@ -706,21 +706,29 @@ def build_technical_analysis(stock: dict) -> str:
         "",
         "🧭 <b>KISA VADE SENARYOLARI</b>",
         SEP,
-        f"✅ <b>YUKARI KIRILMA</b> (Olasılık: {upper_prob})",
-        f"   – {r1_str} üzerinde hacimli kapanış",
-        f"   → {r2_str} hedef.",
-        f"   – RSI yükselişi ve MACD sinyal geçişi görünümü güçlendirir.",
-        "",
-        f"⚠️ <b>YATAY BANT</b> (Olasılık: {range_prob})",
-        f"   – {s1_str} – {r1_str} aralığında sıkışma izlenebilir.",
-        f"   – ADX düşük kalırsa hacimsiz hareketler sürebilir.",
-        "",
-        f"🔻 <b>AŞAĞI KIRILMA</b> (Olasılık: {lower_prob})",
-        f"   – {s1_str} altında kapanış",
-        f"   → {s2_str} ve altı test edilebilir.",
-        f"   – MACD zayıf kalırsa satış baskısı artar.",
-        SEP,
     ]
+    if score >= 3:
+        section_scenarios.append(f"🟢 Kısa vadede yükseliş beklenmektedir.")
+        if r1 is not None:
+             section_scenarios.append(f"Hedef: {r1_str} TL")
+    elif score >= 1:
+        section_scenarios.append(f"🟢 Kısa vadede pozitif ayrışma izleniyor.")
+        if r1 is not None:
+            section_scenarios.append(f"İlk Hedef: {r1_str} TL")
+    elif score <= -3:
+        section_scenarios.append(f"🔴 Kısa vadede düşüş beklenmektedir.")
+        if s1 is not None:
+            section_scenarios.append(f"Destek: {s1_str} TL")
+    elif score <= -1:
+        section_scenarios.append(f"🔴 Kısa vadede negatif seyir izleniyor.")
+        if s1 is not None:
+            section_scenarios.append(f"Ana Destek: {s1_str} TL")
+    else:
+        section_scenarios.append(f"🟡 Kısa vadede yatay seyir beklenmektedir.")
+        if s1 is not None and r1 is not None:
+            section_scenarios.append(f"Bant: {s1_str} - {r1_str} TL")
+    
+    section_scenarios.append(SEP)
 
     all_lines = section_technical + section_fib + section_sr + section_scenarios
     return "\n".join(all_lines)
@@ -737,14 +745,13 @@ def format_stock_message(stock: dict) -> str:
         f"📊 <b>{company_name} ({symbol})</b>\n\n"
         f"📅 {format_report_date()} – {format_report_time()}\n"
         f"{SEP}\n"
-        f"💰 Fiyat      : {price_text}\n"
-        f"\n"
-        f"{change_icon} Değişim    : {change_report_value(change_value)}\n"
-        f"📈 Günlük Max : {stock.get('high', '-')}\n"
-        f"📉 Min        : {stock.get('low', '-')}\n"
-        f"⚖️ AOF (Ort.) : {stock.get('aof', '-')}\n"
-        f"📦 Hacim Lot  : {format_compact_tr(stock.get('volume_lot', '-'))}\n"
-        f"💵 Hacim TL   : {format_compact_tr(stock.get('volume_tl', '-'))}\n"
+        f"💰 Fiyat       : {price_text}\n"
+        f"📉 Değişim     : {change_report_value(change_value)}\n"
+        f"📈 Günlük Max  : {stock.get('high', '-')}\n"
+        f"📉 Min         : {stock.get('low', '-')}\n"
+        f"⚖️ AOF (Ort.)  : {stock.get('aof', '-')}\n"
+        f"📦 Hacim Lot   : {format_compact_tr(stock.get('volume_lot', '-'))}\n"
+        f"💵 Hacim TL    : {format_compact_tr(stock.get('volume_tl', '-'))}\n"
         f"{SEP}"
     )
 
