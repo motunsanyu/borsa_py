@@ -2,8 +2,14 @@ import requests
 import os
 import re
 import time
+from datetime import datetime
 from html import escape, unescape
 from urllib.parse import urlparse
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "YOUR_SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "YOUR_SUPABASE_KEY")
@@ -57,6 +63,21 @@ TRADINGVIEW_COLUMNS = [
     "Recommend.All",
 ]
 
+MONTHS_TR = {
+    1: "Ocak",
+    2: "Şubat",
+    3: "Mart",
+    4: "Nisan",
+    5: "Mayıs",
+    6: "Haziran",
+    7: "Temmuz",
+    8: "Ağustos",
+    9: "Eylül",
+    10: "Ekim",
+    11: "Kasım",
+    12: "Aralık",
+}
+
 def normalize_detail_link(link: str) -> str:
     link = (link or "").strip()
     if not link:
@@ -78,6 +99,9 @@ def parse_tr_number(value):
     if value is None:
         return None
 
+    if isinstance(value, (int, float)):
+        return float(value)
+
     value = str(value).strip().replace("%", "")
     value = re.sub(r"[^0-9,\.\-]", "", value)
     if not value:
@@ -87,6 +111,8 @@ def parse_tr_number(value):
         value = value.replace(".", "").replace(",", ".")
     elif "," in value:
         value = value.replace(",", ".")
+    elif value.count(".") > 1:
+        value = value.replace(".", "")
 
     try:
         return float(value)
@@ -99,6 +125,28 @@ def format_tr_number(value, digits: int = 2) -> str:
 
     formatted = f"{value:,.{digits}f}"
     return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+def format_report_date() -> str:
+    if ZoneInfo:
+        now = datetime.now(ZoneInfo("Europe/Istanbul"))
+    else:
+        now = datetime.now()
+
+    return f"{now.day:02d} {MONTHS_TR[now.month]} {now.year}"
+
+def format_compact_tr(value) -> str:
+    number = parse_tr_number(value)
+    if number is None:
+        return safe_text(value)
+
+    absolute_number = abs(number)
+    if absolute_number >= 1_000_000_000:
+        return f"{format_tr_number(number / 1_000_000_000)} B"
+    if absolute_number >= 1_000_000:
+        return f"{format_tr_number(number / 1_000_000)} M"
+    if absolute_number >= 1_000:
+        return f"{format_tr_number(number / 1_000)} B"
+    return format_tr_number(number)
 
 def strip_html_to_lines(html: str) -> list[str]:
     html = re.sub(r"<script\b[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
@@ -308,6 +356,43 @@ def tv_number(indicators: dict, label: str):
 def indicator_line(label: str, value, comment: str) -> str:
     return f"• <b>{escape(label)}</b>: {safe_text(value)} - {escape(comment)}"
 
+def technical_row(label: str, value, comment: str) -> str:
+    if comment and comment != "-":
+        return f"🔹 <code>{escape(label.ljust(15))}: {safe_text(value)}</code> {escape(comment)}"
+    return f"🔹 <code>{escape(label.ljust(15))}: {safe_text(value)}</code>"
+
+def support_resistance_table(s1, s2, r1, r2) -> str:
+    rows = [
+        ("Destek 1", format_tr_number(s1)),
+        ("Destek 2", format_tr_number(s2)),
+        ("Direnç 1", format_tr_number(r1)),
+        ("Direnç 2", format_tr_number(r2)),
+    ]
+
+    table = [
+        "┌──────────┬──────────┐",
+        *[f"│ {label.ljust(8)} │ {value.ljust(8)} │" for label, value in rows],
+        "└──────────┴──────────┘",
+    ]
+    return "\n".join(table)
+
+def change_report_value(change_value) -> str:
+    change = parse_tr_number(change_value)
+    if change is None:
+        return safe_text(change_value)
+    if change > 0:
+        return f"(▲ +{format_tr_number(abs(change))}%)"
+    if change < 0:
+        return f"(▼ {format_tr_number(abs(change))}%)"
+    return f"({format_tr_number(change)}%)"
+
+def trend_summary(score: int) -> str:
+    if score >= 2:
+        return "Pozitif (orta vade) / Kısa vadede alıcı güçlü"
+    if score <= -2:
+        return "Negatif (orta vade) / Kısa vadede baskı sürüyor"
+    return "Kararsız / Bant hareketi izleniyor"
+
 def tradingview_signal_lines(indicators: dict, price: float | None) -> tuple[list[str], int]:
     lines = []
     score = 0
@@ -382,45 +467,20 @@ def tradingview_signal_lines(indicators: dict, price: float | None) -> tuple[lis
 def build_technical_analysis(stock: dict) -> str:
     details = fetch_stock_details(stock)
     indicators = fetch_tradingview_indicators(stock.get("symbol", ""))
-    symbol = safe_text(stock.get("symbol", "-"))
-    company_name = safe_text(get_company_name(stock))
 
     price = parse_tr_number(stock.get("price"))
     change = parse_tr_number(stock.get("change_percentage"))
     high = parse_tr_number(stock.get("high"))
     low = parse_tr_number(stock.get("low"))
-    avg = parse_tr_number(stock.get("aof"))
 
     open_price = detail_number(details, "Açılış Fiyatı")
     previous_close = detail_number(details, "Önceki Kapanış Fiyatı")
     sma20 = detail_number(details, "20 Günlük Ortalama")
     sma52 = detail_number(details, "52 Günlük Ortalama")
-    weekly_low = detail_number(details, "Haftalık En Düşük")
-    weekly_high = detail_number(details, "Haftalık En Yüksek")
-    monthly_low = detail_number(details, "Aylık En Düşük")
-    monthly_high = detail_number(details, "Aylık En Yüksek")
-    yearly_low = detail_number(details, "Yıllık En Düşük")
-    yearly_high = detail_number(details, "Yıllık En Yüksek")
 
     if price is None:
-        return "\n\n🤖 <b>AI Teknik Yorum</b>\nVeri yetersiz olduğu için teknik yorum üretilemedi."
+        return "\n\n📈 <b>TEKNİK GÖRÜNÜM (ÖZET)</b>\n━━━━━━━━━━━━━━━━━━━━\nVeri yetersiz."
 
-    direction = change_direction(stock.get("change_percentage"))
-    if direction == "up":
-        mood = "alım ağırlıklı"
-        bias = "pozitif"
-        action = "yukarı yönlü denemelerde hacim teyidi aranmalı"
-    elif direction == "down":
-        mood = "satış ağırlıklı"
-        bias = "negatif"
-        action = "tepki alımı için destek bölgesinde kalıcılık izlenmeli"
-    else:
-        mood = "dengeli"
-        bias = "nötr"
-        action = "yatay-sıkışık seyir izlenebilir"
-
-    trend_notes = []
-    momentum_notes = []
     score = 0
 
     if change is not None:
@@ -432,28 +492,22 @@ def build_technical_analysis(stock: dict) -> str:
     if sma20 is not None:
         if price > sma20:
             score += 1
-            trend_notes.append(f"Fiyat 20 günlük ortalamanın üzerinde: {format_tr_number(sma20)}")
         else:
             score -= 1
-            trend_notes.append(f"Fiyat 20 günlük ortalamanın altında: {format_tr_number(sma20)}")
 
     if sma20 is not None and sma52 is not None:
         if sma20 > sma52:
             score += 1
-            trend_notes.append("20 günlük ortalama, 52 günlük ortalamanın üzerinde")
         else:
             score -= 1
-            trend_notes.append("20 günlük ortalama, 52 günlük ortalamanın altında")
 
-    if previous_close is not None:
-        gap = ((price - previous_close) / previous_close) * 100 if previous_close else None
-        if gap is not None:
-            momentum_notes.append(f"Önceki kapanışa göre: {format_tr_number(gap)}%")
+    open_performance = None
+    if open_price is not None and open_price:
+        open_performance = ((price - open_price) / open_price) * 100
 
-    if open_price is not None:
-        intraday = ((price - open_price) / open_price) * 100 if open_price else None
-        if intraday is not None:
-            momentum_notes.append(f"Açılışa göre: {format_tr_number(intraday)}%")
+    previous_performance = None
+    if previous_close is not None and previous_close:
+        previous_performance = ((price - previous_close) / previous_close) * 100
 
     if high is not None and low is not None and high > low:
         day_range = high - low
@@ -465,87 +519,123 @@ def build_technical_analysis(stock: dict) -> str:
 
         if position >= 70:
             score += 1
-            momentum_notes.append("Fiyat gün içi bandın üst bölgesinde")
         elif position <= 30:
             score -= 1
-            momentum_notes.append("Fiyat gün içi bandın alt bölgesinde")
-
-        fib_line = (
-            f"S1 {format_tr_number(fib_s1)} | S2 {format_tr_number(fib_s2)}\n"
-            f"R1 {format_tr_number(fib_r1)} | R2 {format_tr_number(fib_r2)}"
-        )
     else:
-        fib_line = "Gün içi dip-tepe verisi yetersiz"
+        fib_s1 = fib_s2 = fib_r1 = fib_r2 = None
 
     tv_lines, tv_score = tradingview_signal_lines(indicators, price)
     score += tv_score
 
-    range_lines = []
-    if weekly_low is not None and weekly_high is not None:
-        range_lines.append(f"Haftalık: {format_tr_number(weekly_low)} - {format_tr_number(weekly_high)}")
-    if monthly_low is not None and monthly_high is not None:
-        range_lines.append(f"Aylık: {format_tr_number(monthly_low)} - {format_tr_number(monthly_high)}")
-    if yearly_low is not None and yearly_high is not None:
-        range_lines.append(f"Yıllık: {format_tr_number(yearly_low)} - {format_tr_number(yearly_high)}")
+    rsi = tv_number(indicators, "RSI")
+    rsi_previous = tv_number(indicators, "RSI[1]")
+    macd = tv_number(indicators, "MACD.macd")
+    macd_signal = tv_number(indicators, "MACD.signal")
+    adx = tv_number(indicators, "ADX")
+    bb_upper = tv_number(indicators, "BB.upper")
+    bb_lower = tv_number(indicators, "BB.lower")
+    tv_sma5 = tv_number(indicators, "SMA5")
+    tv_sma20 = tv_number(indicators, "SMA20")
 
-    if score >= 2:
-        forecast = "pozitif eğilim güçleniyor; direnç üzeri kapanışlar takip edilmeli"
-    elif score <= -2:
-        forecast = "zayıf görünüm korunuyor; destek altında risk artar"
-    else:
-        forecast = "kararsız bölge; yön teyidi için hacim ve kapanış beklenmeli"
+    rsi_comment = "-"
+    if rsi is not None:
+        if rsi > 55:
+            rsi_comment = "(pozitif, yükseliş eğiliminde)" if rsi_previous is None or rsi >= rsi_previous else "(pozitif, ivme zayıflıyor)"
+        elif rsi < 45:
+            rsi_comment = "(zayıf, satış baskısı sürüyor)" if rsi_previous is None or rsi <= rsi_previous else "(zayıf, tepki arayışı var)"
+        else:
+            rsi_comment = "(nötr, yükseliş eğiliminde)" if rsi_previous is not None and rsi > rsi_previous else "(nötr)"
 
-    change_text = format_change_value(stock.get("change_percentage"))
-    separator = "━━━━━━━━━━━━━━━━"
+    macd_comment = "-"
+    if macd is not None and macd_signal is not None:
+        macd_comment = "(sinyal üstünde, pozitif momentum)" if macd > macd_signal else "(sinyal altında, zayıf momentum)"
+
+    adx_comment = "-"
+    if adx is not None:
+        adx_comment = "(trend gücü yüksek, yönlü hareket gelebilir)" if adx >= 25 else "(trend gücü düşük, yatay bant riski)"
+
+    bb_comment = "-"
+    if price is not None and bb_upper is not None and bb_lower is not None and bb_upper > bb_lower:
+        band_position = ((price - bb_lower) / (bb_upper - bb_lower)) * 100
+        if band_position > 75:
+            bb_comment = "(üst banda yakın, kar satışı izlenir)"
+        elif band_position < 25:
+            bb_comment = "(alt banda yakın, tepki bölgesi)"
+        else:
+            bb_comment = "(orta bant, yön bekleniyor)"
+
+    sma_comment = "-"
+    if tv_sma5 is not None and tv_sma20 is not None:
+        sma_comment = "(kısa vade SMA20 üstünde, pozitif kesişim)" if tv_sma5 > tv_sma20 else "(kısa vade SMA20 altında, negatif kesişim)"
+
+    resistance_target = fib_r2 if fib_r2 is not None else high
+    support_break = fib_s2 if fib_s2 is not None else low
+    upper_probability = "Yüksek" if score >= 2 else "Orta" if score >= 0 else "Düşük"
+    range_probability = "Yüksek" if -1 <= score <= 1 or (adx is not None and adx < 25) else "Orta"
+    lower_probability = "Yüksek" if score <= -2 else "Orta" if score < 0 else "Düşük"
+
+    table = support_resistance_table(fib_s1, fib_s2, fib_r1, fib_r2)
+    trend_text = trend_summary(score)
+
     analysis = [
         "",
         "",
-        "🤖 <b>AI TEKNİK YORUM</b>",
-        separator,
-        f"<b>{company_name} ({symbol})</b>",
-        f"Bugün {mood} seyir var. Hisse {change_text} hareketle {safe_text(stock.get('price', '-'))} TL seviyesinde.",
+        "📈 <b>TEKNİK GÖRÜNÜM (ÖZET)</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        technical_row("Trend Yönü", trend_text, ""),
+        technical_row("RSI (14)", format_tr_number(rsi) if rsi is not None else "-", rsi_comment),
+        technical_row("MACD", f"{format_tr_number(macd)} / {format_tr_number(macd_signal)}" if macd is not None and macd_signal is not None else "-", macd_comment),
+        technical_row("ADX", format_tr_number(adx) if adx is not None else "-", adx_comment),
+        technical_row("Bollinger Band", f"{format_tr_number(bb_lower)} - {format_tr_number(bb_upper)}" if bb_lower is not None and bb_upper is not None else "-", bb_comment),
+        technical_row("SMA 5/20", f"{format_tr_number(tv_sma5)} / {format_tr_number(tv_sma20)}" if tv_sma5 is not None and tv_sma20 is not None else "-", sma_comment),
         "",
-        f"📌 <b>Yön / Senaryo</b>",
-        f"• Ana eğilim: <b>{escape(bias.title())}</b>",
-        f"• Stratejik izleme: {escape(action)}",
+        "📌 <b>DESTEK & DİRENÇ</b>",
+        f"<code>{escape(table)}</code>",
+        "",
+        "🧭 <b>KISA VADE SENARYOLARI</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"✅ <b>YUKARI KIRILMA</b> (Olasılık: {upper_probability})",
+        f"   – {format_tr_number(fib_r1)} üzerinde hacimli kapanış → {format_tr_number(resistance_target)} hedef.",
+        "   – RSI yükselişi ve MACD sinyal geçişi görünümü güçlendirir.",
+        "",
+        f"⚠️ <b>YATAY BANT</b> (Olasılık: {range_probability})",
+        f"   – {format_tr_number(fib_s1)} – {format_tr_number(fib_r1)} aralığında sıkışma izlenebilir.",
+        "   – ADX düşük kalırsa hacimsiz hareketler sürebilir.",
+        "",
+        f"🔻 <b>AŞAĞI KIRILMA</b> (Olasılık: {lower_probability})",
+        f"   – {format_tr_number(support_break)} altında kapanış → {format_tr_number(low)} ve altı test edilebilir.",
+        "   – MACD zayıf kalırsa satış baskısı artar.",
     ]
 
-    if trend_notes or momentum_notes:
-        analysis.extend(["", "📊 <b>Trend ve Momentum</b>"])
-        analysis.extend(f"• {escape(note)}" for note in trend_notes[:3])
-        analysis.extend(f"• {escape(note)}" for note in momentum_notes[:3])
-
-    if tv_lines:
-        analysis.extend(["", "📈 <b>İndikatörler</b>"])
-        analysis.extend(tv_lines[:5])
-
-    analysis.extend(["", "🧭 <b>Destek / Direnç</b>"])
-    analysis.append(escape(fib_line).replace("\n", "\n"))
-
-    if range_lines:
-        analysis.extend(["", "📐 <b>Bantlar</b>", escape(" | ".join(range_lines[:2]))])
-
-    analysis.extend(["", "🔎 <b>Kısa Vadeli Tahmin</b>", escape(forecast)])
+    if previous_performance is not None or open_performance is not None:
+        momentum_parts = []
+        if previous_performance is not None:
+            momentum_parts.append(f"Önceki kapanış: {format_tr_number(previous_performance)}%")
+        if open_performance is not None:
+            momentum_parts.append(f"Açılış: {format_tr_number(open_performance)}%")
+        analysis.insert(11, technical_row("Momentum", " | ".join(momentum_parts), ""))
 
     return "\n".join(analysis)
 
 def format_stock_message(stock: dict) -> str:
     symbol = safe_text(stock.get("symbol", "-"))
     company_name = safe_text(get_company_name(stock))
-    separator = "————————————————"
+    separator = "————————————————————"
     change_value = stock.get("change_percentage", "-")
+    time_text = safe_text(stock.get("time", "-"))
+    price_text = f"{stock.get('price', '-')} TL"
 
     return (
-        f"<b>{symbol} - {company_name}</b>\n"
+        f"📊 <b>{company_name} ({symbol})</b>\n"
+        f"📅 {format_report_date()} – {time_text}\n"
         f"{separator}\n"
-        f"{stock_line('💰', 'Fiyat', stock.get('price', '-'))}\n\n"
-        f"{stock_line(change_icon_for_change(change_value), 'Degisim', format_change_value(change_value))}\n"
-        f"{stock_line('📈', 'En yuksek', stock.get('high', '-'))}\n"
-        f"{stock_line('📉', 'En dusuk', stock.get('low', '-'))}\n"
-        f"{stock_line('⚖️', 'AOF', stock.get('aof', '-'))}\n"
-        f"{stock_line('📦', 'Hacim lot', stock.get('volume_lot', '-'))}\n"
-        f"{stock_line('💵', 'Hacim TL', stock.get('volume_tl', '-'))}\n"
-        f"{stock_line('🕒', 'Saat', stock.get('time', '-'))}\n"
+        f"{stock_line('💰', 'Fiyat', price_text, width=11)}\n\n"
+        f"{stock_line(change_icon_for_change(change_value), 'Değişim', change_report_value(change_value), width=11)}\n\n"
+        f"{stock_line('📈', 'Günlük Max', stock.get('high', '-'), width=11)}\n"
+        f"{stock_line('📉', 'Min', stock.get('low', '-'), width=11)}\n"
+        f"{stock_line('⚖️', 'AOF (Ort.)', stock.get('aof', '-'), width=11)}\n"
+        f"{stock_line('📦', 'Hacim Lot', format_compact_tr(stock.get('volume_lot', '-')), width=11)}\n"
+        f"{stock_line('💵', 'Hacim TL', format_compact_tr(stock.get('volume_tl', '-')), width=11)}\n"
         f"{separator}"
         f"{build_technical_analysis(stock)}"
     )
